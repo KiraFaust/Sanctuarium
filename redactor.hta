@@ -1,0 +1,116 @@
+<html>
+<head>
+<title>Редактор задачи</title>
+
+<hta:application
+border="dialog"
+caption="yes"
+maximizebutton="no"
+minimizebutton="no"
+scroll="no"
+/>
+
+<script language="VBScript">
+
+Dim fso
+Dim taskNum
+Dim taskFile
+Dim j
+
+Set fso = CreateObject("Scripting.FileSystemObject")
+
+
+Dim args
+args = Split(document.parentWindow.commandLine, " ")
+If UBound(args) >= 1 Then
+    taskNum = args(1)
+Else
+    taskNum = 1
+End If
+
+
+If Not fso.FolderExists("Tasks") Then
+    fso.CreateFolder "Tasks"
+End If
+
+taskFile = "Tasks\" & taskNum & ".txt"
+
+Sub Window_OnLoad()
+
+    document.getElementById("title").innerText = "Задача " & taskNum
+    
+    If fso.FileExists(taskFile) Then
+    
+        Dim f
+        Set f = fso.OpenTextFile(taskFile,1)
+        text.value = f.ReadAll
+        f.Close
+        
+    End If
+
+End Sub
+
+
+Sub SaveTask()
+
+    Set f = fso.CreateTextFile(taskFile,True)
+    f.Write text.value
+    f.Close
+    
+    MsgBox "Сохранено"
+
+End Sub
+
+
+Sub DeleteDescription()
+
+    text.value = ""
+
+End Sub
+
+
+Sub DeleteTask()
+
+    If fso.FileExists(taskFile) Then
+        fso.DeleteFile taskFile
+    End If
+    
+    MsgBox "Задача удалена"
+    window.close
+
+End Sub
+
+
+Sub OpenCatalog()
+
+    Dim num
+    num = InputBox("Введите номер задачи")
+    
+    If IsNumeric(num) Then
+    
+        CreateObject("WScript.Shell").Run "mshta.exe task_editor.hta " & num
+	window.close
+        
+    End If
+
+End Sub
+
+</script>
+
+</head>
+
+<body style="font-family:Segoe UI; margin:15px">
+
+<h3 id="title"></h3>
+
+<textarea id="text" style="width:100%; height:220px"></textarea>
+
+<br><br>
+
+<button onclick="SaveTask">Сохранить</button>
+<button onclick="DeleteDescription">Удалить описание</button>
+<button onclick="DeleteTask">Удалить задачу</button>
+<button onclick="OpenCatalog">Каталог задач</button>
+
+</body>
+</html>
