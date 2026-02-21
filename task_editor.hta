@@ -18,18 +18,43 @@ Dim taskFile
 Dim basePath
 
 Set fso = CreateObject("Scripting.FileSystemObject")
-basePath = fso.GetParentFolderName(document.location.pathname)
 
-' Получение номера задачи из командной строки
-Dim args
-args = Split(document.parentWindow.commandLine, " ")
-If UBound(args) >= 1 Then
-    taskNum = args(1)
+' --- Получение пути к текущему HTA-файлу ---
+Dim rawPath, path
+rawPath = window.location.pathname          ' например: "/C:/path/editor.hta"
+If Left(rawPath, 1) = "/" Then rawPath = Mid(rawPath, 2)  ' убираем ведущий слеш
+path = Replace(rawPath, "/", "\")           ' преобразуем в Windows-путь
+basePath = fso.GetParentFolderName(path)    ' папка, где лежит HTA
+
+' --- Получение номера задачи из query string (например, ?num=5) ---
+Dim search, numStr, parts, i, kv
+search = window.location.search              ' "?num=5"
+If search <> "" And Left(search, 1) = "?" Then
+    parts = Split(Mid(search, 2), "&")       ' разбиваем параметры
+    For i = 0 To UBound(parts)
+        If InStr(parts(i), "=") > 0 Then
+            kv = Split(parts(i), "=")
+            If LCase(kv(0)) = "num" Then
+                numStr = kv(1)
+                Exit For
+            End If
+        End If
+    Next
+End If
+
+If IsNumeric(numStr) Then
+    taskNum = CInt(numStr)
 Else
     taskNum = 1
 End If
 
-' Создание папки Tasks, если её нет
+' Проверка: номер задачи должен быть положительным
+If taskNum < 1 Then
+    MsgBox "Номер задачи должен быть положительным. Редактор будет закрыт.", vbCritical, "Ошибка"
+    window.close
+End If
+
+' --- Создание папки Tasks, если её нет ---
 Dim tasksDir
 tasksDir = fso.BuildPath(basePath, "Tasks")
 If Not fso.FolderExists(tasksDir) Then
@@ -50,10 +75,26 @@ Sub Window_OnLoad()
 End Sub
 
 Sub SaveTask()
+    On Error Resume Next   ' для отлова ошибок
+    ' Убедимся, что папка существует (на всякий случай)
+    If Not fso.FolderExists(tasksDir) Then
+        fso.CreateFolder tasksDir
+    End If
+    
+    Dim f
     Set f = fso.CreateTextFile(taskFile, True)
+    If Err.Number <> 0 Then
+        MsgBox "Ошибка при создании файла: " & Err.Description, vbCritical, "Ошибка"
+        Exit Sub
+    End If
     f.Write text.value
     f.Close
-    MsgBox "Сохранено"
+    If Err.Number = 0 Then
+        MsgBox "Сохранено"
+    Else
+        MsgBox "Ошибка при записи: " & Err.Description, vbCritical, "Ошибка"
+    End If
+    On Error GoTo 0
 End Sub
 
 Sub DeleteDescription()
@@ -73,10 +114,15 @@ Sub OpenCatalog()
     num = InputBox("Введите номер задачи")
     
     If IsNumeric(num) Then
-        ' Запускаем новый редактор с полным путём к текущему HTA
-        Dim shell
+        If CInt(num) < 1 Then
+            MsgBox "Номер должен быть положительным.", vbExclamation, "Ошибка"
+            Exit Sub
+        End If
+        ' Формируем путь к редактору с параметром в query string
+        Dim shell, editorPath
         Set shell = CreateObject("WScript.Shell")
-        shell.Run "mshta.exe """ & document.location.pathname & """ " & num
+        editorPath = fso.BuildPath(basePath, "task_editor.hta")
+        shell.Run "mshta.exe """ & editorPath & "?num=" & num & """", 1, True
         window.close
     End If
 End Sub
