@@ -15,11 +15,12 @@ scroll="no"
 Dim fso
 Dim taskNum
 Dim taskFile
-Dim j
+Dim basePath
 
 Set fso = CreateObject("Scripting.FileSystemObject")
+basePath = fso.GetParentFolderName(document.location.pathname)
 
-
+' Получение номера задачи из командной строки
 Dim args
 args = Split(document.parentWindow.commandLine, " ")
 If UBound(args) >= 1 Then
@@ -28,71 +29,56 @@ Else
     taskNum = 1
 End If
 
-
-If Not fso.FolderExists("Tasks") Then
-    fso.CreateFolder "Tasks"
+' Создание папки Tasks, если её нет
+Dim tasksDir
+tasksDir = fso.BuildPath(basePath, "Tasks")
+If Not fso.FolderExists(tasksDir) Then
+    fso.CreateFolder tasksDir
 End If
 
-taskFile = "Tasks\" & taskNum & ".txt"
+taskFile = fso.BuildPath(tasksDir, taskNum & ".txt")
 
 Sub Window_OnLoad()
-
     document.getElementById("title").innerText = "Задача " & taskNum
     
     If fso.FileExists(taskFile) Then
-    
         Dim f
-        Set f = fso.OpenTextFile(taskFile,1)
+        Set f = fso.OpenTextFile(taskFile, 1)
         text.value = f.ReadAll
         f.Close
-        
     End If
-
 End Sub
-
 
 Sub SaveTask()
-
-    Set f = fso.CreateTextFile(taskFile,True)
+    Set f = fso.CreateTextFile(taskFile, True)
     f.Write text.value
     f.Close
-    
     MsgBox "Сохранено"
-
 End Sub
-
 
 Sub DeleteDescription()
-
     text.value = ""
-
 End Sub
 
-
 Sub DeleteTask()
-
     If fso.FileExists(taskFile) Then
         fso.DeleteFile taskFile
     End If
-    
     MsgBox "Задача удалена"
     window.close
-
 End Sub
 
-
 Sub OpenCatalog()
-
     Dim num
     num = InputBox("Введите номер задачи")
     
     If IsNumeric(num) Then
-    
-        CreateObject("WScript.Shell").Run "mshta.exe task_editor.hta " & num
-	window.close
-        
+        ' Запускаем новый редактор с полным путём к текущему HTA
+        Dim shell
+        Set shell = CreateObject("WScript.Shell")
+        shell.Run "mshta.exe """ & document.location.pathname & """ " & num
+        window.close
     End If
-
 End Sub
 
 </script>
